@@ -109,16 +109,15 @@ class RNNModel:
         obs = x.reshape(1, self.input_size)
 
         for jj in range(self.n_layers):
-            
-           
-            if self.step % self.freqs[jj] == 0:
-                #print(self.freqs[jj], jj, self.step)
-                if jj != 0:
+            if jj == 0:
+                self.hs[jj] = np.copy(binarize(sigmoid(self.rnns[jj](x, self.hs[jj]))))
+            else:
+                if self.hs[jj -1][0][-1] == 1:
+                    #print(self.step)
+                    #print(self.freqs[jj], jj, self.step)
                     self.hs[jj] = np.copy(binarize(sigmoid(self.rnns[jj](self.hs[jj -1], self.hs[jj]))))
-                    #self.hs[jj - 1] = self.init_h
-                else:
-                    self.hs[jj] = np.copy(binarize(sigmoid(self.rnns[jj](x, self.hs[jj]))))
-                
+                    self.hs[jj - 1] = self.init_h
+                    
 
         x = np.concatenate([x] + self.hs, axis=1)
 
@@ -181,7 +180,7 @@ def recurrency_label(seq_len):
     X = np.zeros([seq_len,1])
     #X[0,:] = 1.0
     for ii in range(seq_len):
-        if ii % 666 == 0:
+        if ii % 651 == 0:
             labels.append(np.ones([1,1]))
 
         else:
