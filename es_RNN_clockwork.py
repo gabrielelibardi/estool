@@ -53,18 +53,30 @@ class RNNModel:
 
         self.layer_1 = 30
         self.layer_2 = 30
+        self.n_layers = 3
 
         self.rnn_mode = True
 
         self.input_size = 1
         self.output_size = 1
-        self.alpha = 45
 
-
-        self.shapes = [ (self.input_size + self.hidden_size, 1*self.hidden_size), # RNN weights
-                        (self.input_size + self.hidden_size, self.layer_1),# predict actions output
-                        (self.layer_1, self.output_size)] # predict actions output
-
+        self.freqs = []
+        self.shapes  = [] 
+        for lyr_n in range(self.n_layers):
+            if lyr_n == 0:
+                self.shapes.append((self.input_size + self.hidden_size, 1*self.hidden_size))
+            else:
+                self.shapes.append((2*self.hidden_size, 1*self.hidden_size))
+                
+            self.freqs.append(10**lyr_n)
+            
+         
+        
+        self.shapes +=  [ (self.input_size +  self.n_layers*self.hidden_size, self.layer_1),# predict actions output
+                        (self.layer_1, self.output_size)]   # predict actions output
+        
+        
+        
         self.weight = []
         self.bias = []
         self.param_count = 0
@@ -77,59 +89,64 @@ class RNNModel:
           idx += 1
 
         self.init_h = np.zeros((1, self.hidden_size))
-        self.h = self.init_h
-        self.param_count += 1*self.hidden_size
-
-        self.rnn = RNNCell(self.input_size, self.weight[0], self.bias[0])
+        self.hs = []
+        #self.param_count += 1*self.hidden_size
+        self.rnns = []
+        for rnn_n in range(self.n_layers):
+            if lyr_n == 0:
+                self.rnns.append(RNNCell(self.input_size, self.weight[rnn_n], self.bias[rnn_n]))
+            else:
+                 self.rnns.append(RNNCell(self.hidden_size, self.weight[rnn_n], self.bias[rnn_n]))
 
     def reset(self):
-        
-       
-        self.count = 0
-        if   self.alpha <= self.count:
-            self.h = binarize(sigmoid(self.init_h))
-        else:
-             self.h =  sigmoid(self.init_h)
-        
+        self.hs = []
+        for kk in range(self.n_layers):
+            self.hs.append(binarize(sigmoid(self.init_h)))
+        self.step = 0
 
-
+        
     def get_action(self, x):
         obs = x.reshape(1, self.input_size)
-        self.count += 1
 
-        # update rnn:
-        #update_obs = np.concatenate([obs, action], axis=1)
-         
-#         if  self.alpha <= self.count:
-        self.h = binarize(sigmoid(self.rnn(x, self.h)))
-        x = np.concatenate([x, self.h], axis=1)
+        for jj in range(self.n_layers):
+            
+           
+            if self.step % self.freqs[jj] == 0:
+                #print(self.freqs[jj], jj, self.step)
+                if jj != 0:
+                    self.hs[jj] = np.copy(binarize(sigmoid(self.rnns[jj](self.hs[jj -1], self.hs[jj]))))
+                    self.hs[jj - 1] = self.init_h
+                else:
+                    self.hs[jj] = np.copy(binarize(sigmoid(self.rnns[jj](x, self.hs[jj]))))
+                
 
-#         else:
-#             self.h = sigmoid(self.rnn(x, self.h))
-#             x = np.concatenate([x, self.h], axis=1)
+        x = np.concatenate([x] + self.hs, axis=1)
 
-        # calculate action using 2 layer network from output
-        hidden = np.tanh(np.matmul(x, self.weight[1]) + self.bias[1])
-        action = sigmoid(np.matmul(hidden, self.weight[2]) + self.bias[2])
+
+        hidden = np.tanh(np.matmul(x, self.weight[-2]) + self.bias[-2])
+        action = sigmoid(np.matmul(hidden, self.weight[-1]) + self.bias[-1])
+        #import ipdb; ipdb.set_trace()
+        self.step += 1
 
         return action[0]
 
     def set_model_params(self, model_params):
         pointer = 0
         for i in range(len(self.shapes)):
-          w_shape = self.shapes[i]
-          b_shape = self.shapes[i][1]
-          s_w = np.product(w_shape)
-          s = s_w + b_shape
-          chunk = np.array(model_params[pointer:pointer+s])
-          self.weight[i] = chunk[:s_w].reshape(w_shape)
-          self.bias[i] = chunk[s_w:].reshape(b_shape)
-          pointer += s
+            w_shape = self.shapes[i]
+            b_shape = self.shapes[i][1]
+            s_w = np.product(w_shape)
+            s = s_w + b_shape
+            chunk = np.array(model_params[pointer:pointer+s])
+            self.weight[i] = chunk[:s_w].reshape(w_shape)
+            self.bias[i] = chunk[s_w:].reshape(b_shape)
+            pointer += s
         # rnn states
         s = self.hidden_size
-        self.init_h = model_params[pointer:pointer+s].reshape((1, self.hidden_size))
-        self.h = self.init_h
-        self.rnn = RNNCell(self.input_size, self.weight[0], self.bias[0])
+        #self.init_h = model_params[pointer:pointer+s].reshape((1, self.hidden_size))
+        #self.h = self.init_h
+        for kk in range(self.n_layers):
+            self.rnns[kk] = RNNCell(self.input_size, self.weight[kk], self.bias[kk])
 
     def load_model(self, filename):
         with open(filename) as f:    
@@ -164,7 +181,7 @@ def recurrency_label(seq_len):
     X = np.zeros([seq_len,1])
     #X[0,:] = 1.0
     for ii in range(seq_len):
-        if ii % 61 == 0:
+        if ii % 666 == 0:
             labels.append(np.ones([1,1]))
 
         else:
@@ -179,7 +196,7 @@ def evluate_func(data):
     model.set_model_params(params)
     model.reset()
     loss_cum = 0
-    Xs, labels  = recurrency_label(64)
+    Xs, labels  = recurrency_label(670)
 
     for x, label in zip(Xs,labels):
         
@@ -191,7 +208,6 @@ def evluate_func(data):
 #         if model.count >= model.alpha:
         loss = np.abs(BCE_loss(label, pred))
         loss_cum += loss
-    #print(loss_cum)
     return -loss_cum
 
 def evluate_func_test(model, params):
@@ -200,7 +216,7 @@ def evluate_func_test(model, params):
     model.reset()
 
     loss_cum = 0
-    Xs, labels  = recurrency_label(63)
+    Xs, labels  = recurrency_label(670)
 
     for x, label in zip(Xs,labels):
         
@@ -208,7 +224,7 @@ def evluate_func_test(model, params):
         
         pred = model.get_action(x)
         
-        print(model.h)
+        #print(model.h)
         
         loss = np.abs(BCE_loss(label, pred))
         print(label, pred, loss)
@@ -240,6 +256,8 @@ def test_solver(solver):
         solutions = solver.ask()
         fitness_list = np.zeros(solver.popsize)
         #print(solutions)
+#         for i in range(solver.popsize):
+#             fit_func((model,solutions[i]))
         fitness_list = pool.map(fit_func, [(model,solutions[i]) for i in range(solver.popsize)])
             
 
@@ -275,7 +293,7 @@ def test_solver(solver):
         if (j+1) % 100 == 0:   
             evluate_func_test(model, result[0])
 
-        if -result[1] <= 0.0000001 and model.alpha <= 0:
+        if -result[1] <= 0.0000001:
             print("local optimum discovered by solver:\n", result[0])
             print("fitness score at this local optimum:", result[1])
             return history, result
