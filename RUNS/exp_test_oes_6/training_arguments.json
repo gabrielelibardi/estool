@@ -1,0 +1,17 @@
+{
+    "log_dir": "RUNS/exp_test_oes_6",
+    "n_population": 60,
+    "elite_ratio": 0.05,
+    "seq_len": 40,
+    "restart_model": null,
+    "n_layers": 1,
+    "forget_best": false,
+    "algo": "oes",
+    "binary": false,
+    "multiscale": false,
+    "lr": 0.1,
+    "sigma_init": 0.5,
+    "sigma_decay": 1.0,
+    "lr_decay": 1.0,
+    "rank_fitness": false
+}

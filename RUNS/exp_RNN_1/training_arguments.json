@@ -1,0 +1,11 @@
+{
+    "log_dir": "RUNS/exp_RNN_1",
+    "device": "cpu",
+    "lr": 0.01,
+    "mod": 5,
+    "seq_len": 10,
+    "restart_model": null,
+    "cl": null,
+    "n_layers": 1,
+    "lstm": false
+}

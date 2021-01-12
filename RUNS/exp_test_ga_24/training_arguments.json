@@ -1,0 +1,11 @@
+{
+    "log_dir": "RUNS/exp_test_ga_24",
+    "n_population": 500,
+    "seq_len": 40,
+    "restart_model": null,
+    "n_layers": 1,
+    "forget_best": false,
+    "algo": "ga",
+    "binary": false,
+    "multiscale": false
+}

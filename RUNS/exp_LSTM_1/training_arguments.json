@@ -1,0 +1,10 @@
+{
+    "log_dir": "RUNS/exp_LSTM_1",
+    "device": "cpu",
+    "lr": 0.001,
+    "mod": 5,
+    "seq_len": 10,
+    "restart_model": null,
+    "cl": null,
+    "n_layers": 1
+}
